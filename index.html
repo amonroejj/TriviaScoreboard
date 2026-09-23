@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trivia Baseball Scoreboard</title>
+<style>
+  :root{
+    --cream:#f3ead3;
+    --cream-hi:#faf5e6;
+    --board-navy:#1b2430;
+    --board-navy-dark:#121922;
+    --ink:#20242c;
+    --red:#c1272d;
+    --red-dark:#8f1c21;
+    --red-bright:#ff6f73;
+    --blue:#1e5fb4;
+    --blue-dark:#154385;
+    --blue-bright:#7fb0ff;
+    --gold:#d9a441;
+    --gold-dark:#b9832a;
+    --field-green:#4a8c57;
+    --field-green-dark:#2d5c37;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    overflow:hidden;
+    background:radial-gradient(ellipse at 50% 0%, var(--cream-hi), var(--cream));
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;
+  }
+
+  button{ font-family:inherit; }
+  button:focus-visible{ outline:3px solid var(--gold); outline-offset:2px; }
+
+  .app{
+    height:100vh; height:100dvh; width:100vw;
+    display:flex; flex-direction:column;
+    gap:clamp(10px,1.6vh,20px);
+    padding:clamp(10px,1.6vw,22px);
+  }
+
+  /* ---------- Scoreboard ---------- */
+  .board{
+    position:relative;
+    background:linear-gradient(180deg,var(--board-navy),var(--board-navy-dark));
+    border-radius:18px;
+    padding:clamp(12px,1.8vh,20px) clamp(14px,2vw,26px);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.06), 0 10px 24px rgba(0,0,0,.35);
+    flex:0 0 auto;
+  }
+  .board-grid-cols{
+    grid-template-columns: minmax(88px,150px) 1fr minmax(56px,86px);
+  }
+  .board-header, .board-row{
+    display:grid;
+    grid-template-columns: minmax(88px,150px) 1fr minmax(56px,86px);
+    align-items:center;
+    gap:clamp(4px,1vw,10px);
+  }
+  .board-header{ padding-bottom:.3em; }
+  .header-cell{
+    text-align:center;
+    font-size:clamp(10px,1.1vw,13px);
+    color:rgba(243,234,211,.5);
+    font-weight:700;
+  }
+  .total-label{
+    text-align:center;
+    font-size:clamp(10px,1.1vw,13px);
+    color:rgba(217,164,65,.85);
+    font-weight:800;
+  }
+  .board-row{ padding:.25em 0; border-radius:10px; transition:background .2s ease; }
+  .board-row.batting{ background:rgba(255,255,255,.045); }
+  .team-tag{
+    display:flex; align-items:center; gap:.4em;
+    font-weight:900; letter-spacing:.03em;
+    font-size:clamp(15px,2.2vw,25px);
+  }
+  .team-tag.red{ color:var(--red-bright); }
+  .team-tag.blue{ color:var(--blue-bright); }
+  .arrow{
+    display:inline-block; width:.8em;
+    opacity:0; transform:translateX(-2px);
+    transition:opacity .25s ease, transform .25s ease;
+    font-size:.75em;
+  }
+  .arrow.active{ opacity:1; transform:translateX(0); }
+
+  .innings{ display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:3px; }
+  .inning-cell{
+    background:rgba(255,255,255,.06);
+    border-radius:6px;
+    text-align:center;
+    font-variant-numeric:tabular-nums;
+    font-weight:800;
+    color:var(--cream);
+    font-size:clamp(13px,1.7vw,19px);
+    padding:.4em 0;
+  }
+  .inning-cell.current{
+    background:rgba(255,255,255,.16);
+    box-shadow:0 0 0 2px rgba(255,255,255,.22) inset;
+  }
+  .total{
+    background:var(--gold);
+    color:#241b06;
+    font-weight:900;
+    text-align:center;
+    border-radius:6px;
+    font-size:clamp(16px,2.1vw,23px);
+    padding:.32em 0;
+  }
+
+  .ghost-btn{
+    position:absolute; top:clamp(10px,1.6vh,16px); right:clamp(12px,1.8vw,20px);
+    background:rgba(255,255,255,.08);
+    color:var(--cream);
+    border:1px solid rgba(255,255,255,.25);
+    border-radius:999px;
+    padding:.5em 1.1em;
+    font-weight:700;
+    font-size:clamp(11px,1.1vw,14px);
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  .ghost-btn:hover{ background:rgba(255,255,255,.16); }
+  .ghost-btn:active{ background:rgba(255,255,255,.22); }
+
+  /* ---------- Playfield ---------- */
+  .playfield{
+    flex:1;
+    min-height:0;
+    display:grid;
+    grid-template-columns:minmax(150px,220px) 1fr minmax(190px,260px);
+    gap:clamp(10px,1.6vw,22px);
+  }
+
+  .rail{ display:flex; flex-direction:column; gap:clamp(8px,1.4vh,16px); min-height:0; }
+
+  .outs-panel{
+    background:var(--cream-hi);
+    border:2px solid rgba(32,36,44,.08);
+    border-radius:16px;
+    padding:clamp(10px,1.6vh,18px) clamp(10px,1.2vw,14px);
+    text-align:center;
+    box-shadow:0 4px 10px rgba(0,0,0,.06);
+    flex:0 0 auto;
+  }
+  .outs-label{
+    font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--ink); opacity:.6;
+    font-size:clamp(11px,1.2vw,14px);
+    margin-bottom:.45em;
+  }
+  .outs-marks{ display:flex; justify-content:center; gap:.5em; }
+  .out-mark{
+    font-size:clamp(22px,2.8vw,32px);
+    font-weight:900;
+    color:#ddd2b3;
+    transition:color .2s ease, transform .2s ease;
+  }
+  .out-mark.lit{ color:var(--red-dark); transform:scale(1.12); }
+
+  .action-btn{
+    flex:1;
+    border:none; border-radius:16px;
+    font-weight:800;
+    font-size:clamp(15px,1.9vw,21px);
+    color:#fff;
+    cursor:pointer;
+    padding:clamp(12px,2vh,22px) 8px;
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    box-shadow:0 5px 0 rgba(0,0,0,.22), 0 8px 16px rgba(0,0,0,.12);
+    transition:transform .08s ease, box-shadow .08s ease, filter .15s ease;
+  }
+  .action-btn:hover:not(:disabled){ filter:brightness(1.06); }
+  .action-btn:active:not(:disabled){
+    transform:translateY(4px);
+    box-shadow:0 1px 0 rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.12);
+  }
+  .action-btn:disabled{ filter:grayscale(.55) opacity(.4); cursor:not-allowed; box-shadow:none; transform:none; }
+
+  .out-btn{ background:linear-gradient(180deg,#525d6e,#333d4b); }
+  .change-btn{ background:linear-gradient(180deg,var(--gold),var(--gold-dark)); color:#2a1e04; }
+  .hr-btn{ background:linear-gradient(180deg,#e6bd58,var(--gold-dark)); color:#2a1e04; }
+  .triple-btn{ background:linear-gradient(180deg,#5a9c66,var(--field-green-dark)); }
+  .double-btn{ background:linear-gradient(180deg,#5292a1,#316774); }
+  .single-btn{ background:linear-gradient(180deg,#4e7fbf,var(--blue-dark)); }
+
+  .diamond-wrap{
+    position:relative;
+    min-width:0; min-height:0;
+    border-radius:22px;
+    background:radial-gradient(circle at 50% 32%, #6aac74, var(--field-green-dark));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.08), 0 8px 20px rgba(0,0,0,.15);
+    display:flex; align-items:center; justify-content:center;
+    padding:clamp(10px,2vw,18px);
+  }
+  #diamondSvg{ width:100%; height:100%; max-width:560px; max-height:560px; }
+
+  .toast{
+    position:absolute; top:8%; left:50%;
+    transform:translate(-50%,-8px);
+    background:rgba(18,22,28,.88);
+    color:#fff;
+    padding:.5em 1.1em;
+    border-radius:999px;
+    font-weight:800;
+    font-size:clamp(14px,1.9vw,19px);
+    opacity:0; pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+    white-space:nowrap;
+  }
+  .toast.show{ opacity:1; transform:translate(-50%,0); }
+
+  .runner{ filter:drop-shadow(0 3px 4px rgba(0,0,0,.35)); }
+
+  @media (max-width:840px){
+    .playfield{ grid-template-columns:1fr; grid-template-rows:auto 1fr auto; }
+    .rail{ flex-direction:row; }
+    .rail-left{ order:1; }
+    .diamond-wrap{ order:2; }
+    .rail-right{ order:3; }
+    .outs-panel{ flex:0 0 auto; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="board">
+    <button class="ghost-btn" id="newGameBtn" type="button">New game</button>
+
+    <div class="board-header">
+      <div></div>
+      <div class="innings" id="inningsHeader"></div>
+      <div class="total-label">R</div>
+    </div>
+
+    <div class="board-row" data-team="red">
+      <div class="team-tag red"><span class="arrow" id="arrowRed">&#9654;</span>RED</div>
+      <div class="innings" id="inningsRed"></div>
+      <div class="total" id="totalRed">0</div>
+    </div>
+
+    <div class="board-row" data-team="blue">
+      <div class="team-tag blue"><span class="arrow" id="arrowBlue">&#9654;</span>BLUE</div>
+      <div class="innings" id="inningsBlue"></div>
+      <div class="total" id="totalBlue">0</div>
+    </div>
+  </header>
+
+  <main class="playfield">
+
+    <section class="rail rail-left">
+      <div class="outs-panel">
+        <div class="outs-label">Outs</div>
+        <div class="outs-marks" id="outsMarks">
+          <span class="out-mark" data-n="1">X</span>
+          <span class="out-mark" data-n="2">X</span>
+          <span class="out-mark" data-n="3">X</span>
+        </div>
+      </div>
+      <button class="action-btn out-btn" id="outBtn" type="button">Out</button>
+      <button class="action-btn change-btn" id="changeBtn" type="button">Change</button>
+    </section>
+
+    <section class="diamond-wrap">
+      <svg id="diamondSvg" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <polygon points="200,335 305,225 200,115 95,225" fill="rgba(0,0,0,.08)"></polygon>
+        <polyline points="200,350 325,225 200,100 75,225 200,350"
+                   fill="none" stroke="rgba(255,255,255,.55)" stroke-width="3"
+                   stroke-dasharray="2 8" stroke-linecap="round"></polyline>
+        <line x1="200" y1="350" x2="385" y2="165" stroke="rgba(255,255,255,.35)" stroke-width="2" stroke-dasharray="2 8"></line>
+        <line x1="200" y1="350" x2="15" y2="165" stroke="rgba(255,255,255,.35)" stroke-width="2" stroke-dasharray="2 8"></line>
+
+        <rect x="187" y="337" width="26" height="26" rx="4" fill="#f7f3e8" stroke="#20242c" stroke-width="2"></rect>
+        <rect x="312" y="212" width="26" height="26" rx="4" fill="#f7f3e8" stroke="#20242c" stroke-width="2"></rect>
+        <rect x="187" y="87" width="26" height="26" rx="4" fill="#f7f3e8" stroke="#20242c" stroke-width="2"></rect>
+        <rect x="62" y="212" width="26" height="26" rx="4" fill="#f7f3e8" stroke="#20242c" stroke-width="2"></rect>
+
+        <g id="runnerLayer"></g>
+      </svg>
+      <div class="toast" id="toast"></div>
+    </section>
+
+    <section class="rail rail-right">
+      <button class="action-btn hit-btn hr-btn" data-hit="4" type="button">Home run</button>
+      <button class="action-btn hit-btn triple-btn" data-hit="3" type="button">Triple</button>
+      <button class="action-btn hit-btn double-btn" data-hit="2" type="button">Double</button>
+      <button class="action-btn hit-btn single-btn" data-hit="1" type="button">Single</button>
+    </section>
+
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // Base coordinates in the SVG viewBox. Index: 0=home/batter box, 1=first,
+  // 2=second, 3=third, 4=home (scoring). Index 4 shares home's coordinates.
+  var BASES = [
+    {x:200,y:350}, {x:325,y:225}, {x:200,y:100}, {x:75,y:225}, {x:200,y:350}
+  ];
+  var TEAM_COLOR = { red:'#c1272d', blue:'#1e5fb4' };
+  var HIT_LABEL = {1:'Single',2:'Double',3:'Triple',4:'Home run'};
+
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var SEGMENT_MS = reducedMotion ? 1 : 420;
+
+  var svgNS = 'http://www.w3.org/2000/svg';
+  var runnerLayer = document.getElementById('runnerLayer');
+
+  var state = {
+    runs: { red:[0], blue:[0] },
+    inning: 1,
+    battingTeam: 'red',
+    outs: 0,
+    runners: [],   // resting runners: {id, el, pos} pos in {1,2,3}
+    animCount: 0
+  };
+  var idSeq = 1;
+
+  function cap(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  // ---------------- Scoreboard rendering ----------------
+  function renderBoard(){
+    var maxInnings = Math.max(9, state.inning);
+    ['red','blue'].forEach(function(team){
+      while (state.runs[team].length < maxInnings) state.runs[team].push(0);
+    });
+
+    renderInningsHeader(maxInnings);
+    renderInningsRow('red', maxInnings);
+    renderInningsRow('blue', maxInnings);
+
+    document.getElementById('totalRed').textContent = sum(state.runs.red);
+    document.getElementById('totalBlue').textContent = sum(state.runs.blue);
+
+    document.getElementById('arrowRed').classList.toggle('active', state.battingTeam === 'red');
+    document.getElementById('arrowBlue').classList.toggle('active', state.battingTeam === 'blue');
+    document.querySelector('.board-row[data-team="red"]').classList.toggle('batting', state.battingTeam === 'red');
+    document.querySelector('.board-row[data-team="blue"]').classList.toggle('batting', state.battingTeam === 'blue');
+  }
+
+  function sum(arr){ return arr.reduce(function(a,b){ return a+b; }, 0); }
+
+  function renderInningsHeader(maxInnings){
+    var wrap = document.getElementById('inningsHeader');
+    wrap.innerHTML = '';
+    for (var i=0; i<maxInnings; i++){
+      var cell = document.createElement('div');
+      cell.className = 'header-cell';
+      cell.textContent = i+1;
+      wrap.appendChild(cell);
+    }
+  }
+
+  function renderInningsRow(team, maxInnings){
+    var wrap = document.getElementById('innings' + cap(team));
+    wrap.innerHTML = '';
+    for (var i=0; i<maxInnings; i++){
+      var cell = document.createElement('div');
+      cell.className = 'inning-cell';
+      if (i === state.inning-1 && state.battingTeam === team) cell.classList.add('current');
+      cell.textContent = state.runs[team][i] || 0;
+      wrap.appendChild(cell);
+    }
+  }
+
+  // ---------------- Outs rendering ----------------
+  function renderOuts(){
+    var marks = document.querySelectorAll('.out-mark');
+    marks.forEach(function(el){
+      el.classList.toggle('lit', Number(el.dataset.n) <= state.outs);
+    });
+  }
+
+  // ---------------- Buttons ----------------
+  function refreshButtons(){
+    var locked = state.animCount > 0;
+    var outsFull = state.outs >= 3;
+    document.querySelectorAll('.hit-btn').forEach(function(b){ b.disabled = locked || outsFull; });
+    document.getElementById('outBtn').disabled = locked || outsFull;
+    document.getElementById('changeBtn').disabled = locked;
+  }
+
+  // ---------------- Toast ----------------
+  var toastTimer = null;
+  function showToast(text){
+    var t = document.getElementById('toast');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 1100);
+  }
+
+  // ---------------- Easing ----------------
+  function easeInOutCubic(t){ return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2; }
+
+  // ---------------- Runner animation ----------------
+  function animateRunner(el, fromPos, toPos, onDone){
+    var waypoints = [];
+    for (var p = fromPos+1; p <= toPos; p++) waypoints.push(BASES[p]);
+    if (waypoints.length === 0){ onDone(); return; }
+
+    state.animCount++;
+    var segIndex = 0;
+    var start = BASES[fromPos];
+
+    function runSegment(){
+      var target = waypoints[segIndex];
+      var t0 = performance.now();
+      var sx = start.x, sy = start.y, dx = target.x - sx, dy = target.y - sy;
+
+      function frame(now){
+        var t = Math.min(1, (now - t0) / SEGMENT_MS);
+        var e = easeInOutCubic(t);
+        el.setAttribute('cx', sx + dx*e);
+        el.setAttribute('cy', sy + dy*e);
+        if (t < 1){
+          requestAnimationFrame(frame);
+        } else {
+          start = target;
+          segIndex++;
+          if (segIndex < waypoints.length){
+            runSegment();
+          } else {
+            state.animCount--;
+            onDone();
+          }
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+    runSegment();
+  }
+
+  function spawnRunnerEl(color, atPos){
+    var c = document.createElementNS(svgNS, 'circle');
+    c.setAttribute('r', 20);
+    c.setAttribute('cx', BASES[atPos].x);
+    c.setAttribute('cy', BASES[atPos].y);
+    c.setAttribute('fill', color);
+    c.setAttribute('stroke', '#fff');
+    c.setAttribute('stroke-width', 3);
+    c.setAttribute('class', 'runner');
+    runnerLayer.appendChild(c);
+    return c;
+  }
+
+  // ---------------- Core actions ----------------
+  function currentInningIdx(){ return state.inning - 1; }
+
+  function awardRun(team){
+    var idx = currentInningIdx();
+    while (state.runs[team].length <= idx) state.runs[team].push(0);
+    state.runs[team][idx] += 1;
+    renderBoard();
+  }
+
+  function doHit(bases){
+    if (state.animCount > 0 || state.outs >= 3) return;
+
+    var team = state.battingTeam;
+    var color = TEAM_COLOR[team];
+    var existing = state.runners.slice();
+    state.runners = [];
+
+    var pending = existing.length + 1;
+    function settle(){
+      pending--;
+      if (pending <= 0) refreshButtons();
+    }
+
+    existing.forEach(function(r){
+      var newPos = Math.min(r.pos + bases, 4);
+      animateRunner(r.el, r.pos, newPos, function(){
+        if (newPos >= 4){
+          awardRun(team);
+          r.el.remove();
+        } else {
+          r.pos = newPos;
+          state.runners.push(r);
+        }
+        settle();
+      });
+    });
+
+    var batterPos = Math.min(bases, 4);
+    var batterEl = spawnRunnerEl(color, 0);
+    var batterObj = { id: idSeq++, el: batterEl, pos: 0 };
+    animateRunner(batterEl, 0, batterPos, function(){
+      if (batterPos >= 4){
+        awardRun(team);
+        batterEl.remove();
+      } else {
+        batterObj.pos = batterPos;
+        state.runners.push(batterObj);
+      }
+      settle();
+    });
+
+    refreshButtons();
+    showToast(HIT_LABEL[bases] + ' \u2014 ' + cap(team));
+  }
+
+  function doOut(){
+    if (state.animCount > 0 || state.outs >= 3) return;
+    state.outs++;
+    renderOuts();
+    refreshButtons();
+    showToast('Out \u2014 ' + cap(state.battingTeam));
+  }
+
+  function clearBases(){
+    state.runners.forEach(function(r){ r.el.remove(); });
+    state.runners = [];
+  }
+
+  function doChange(){
+    if (state.animCount > 0) return;
+    clearBases();
+    if (state.battingTeam === 'red'){
+      state.battingTeam = 'blue';
+    } else {
+      state.battingTeam = 'red';
+      state.inning++;
+    }
+    state.outs = 0;
+    renderOuts();
+    renderBoard();
+    refreshButtons();
+    showToast(cap(state.battingTeam) + ' at bat');
+  }
+
+  function doNewGame(){
+    if (!window.confirm('Start a new game? This clears the scoreboard.')) return;
+    clearBases();
+    state.runs = { red:[0], blue:[0] };
+    state.inning = 1;
+    state.battingTeam = 'red';
+    state.outs = 0;
+    renderOuts();
+    renderBoard();
+    refreshButtons();
+  }
+
+  // ---------------- Wire up ----------------
+  document.querySelectorAll('.hit-btn').forEach(function(b){
+    b.addEventListener('click', function(){ doHit(Number(b.dataset.hit)); });
+  });
+  document.getElementById('outBtn').addEventListener('click', doOut);
+  document.getElementById('changeBtn').addEventListener('click', doChange);
+  document.getElementById('newGameBtn').addEventListener('click', doNewGame);
+
+  renderOuts();
+  renderBoard();
+  refreshButtons();
+})();
+</script>
+</body>
+</html>
